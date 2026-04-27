@@ -4,7 +4,7 @@ import Icon from "@/components/ui/icon";
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 type SetType = "warmup" | "working" | "failure" | "dropset";
-type Tab = "days" | "stats" | "settings";
+type Tab = "days" | "settings";
 
 interface WorkSet {
   id: string;
@@ -91,10 +91,37 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
 const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 const tonnage = (day: TrainingDay) => day.exercises.flatMap(e => e.sets).reduce((a, s) => a + s.weight * s.reps, 0);
-const progress = (day: TrainingDay) => {
-  const all = day.exercises.flatMap(e => e.sets);
-  return all.length ? Math.round(all.filter(s => s.done).length / all.length * 100) : 0;
-};
+
+// ─── Action Menu (center popup) ──────────────────────────────────────────────
+
+function ActionMenu({ open, onClose, actions }: {
+  open: boolean; onClose: () => void;
+  actions: { label: string; icon: string; danger?: boolean; onClick: () => void }[];
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center px-6" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative w-full max-w-xs animate-scale-in" onClick={e => e.stopPropagation()}>
+        <div className="bg-[#242429] rounded-3xl overflow-hidden border border-white/8">
+          {actions.map((a, i) => (
+            <button
+              key={i}
+              onClick={() => { a.onClick(); onClose(); }}
+              className={`w-full flex items-center gap-4 px-5 py-4 text-left transition-colors active:bg-white/8 ${i > 0 ? "border-t border-white/6" : ""} ${a.danger ? "text-red-400" : "text-white/80"}`}
+            >
+              <Icon name={a.icon} fallback="Circle" size={20} className={a.danger ? "text-red-400" : "text-white/50"} />
+              <span className="text-base font-medium">{a.label}</span>
+            </button>
+          ))}
+        </div>
+        <button onClick={onClose} className="w-full mt-3 py-4 rounded-3xl bg-[#242429] border border-white/8 text-white/60 font-semibold text-base active:bg-white/10 transition-colors">
+          Отмена
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ─── Bottom Sheet Modal ──────────────────────────────────────────────────────
 
@@ -250,10 +277,11 @@ function SetRow({ set, index, onUpdate, onDelete, onRest }: {
 
 // ─── Exercise Card ───────────────────────────────────────────────────────────
 
-function ExCard({ ex, onUpdate, onDelete }: {
-  ex: Exercise; onUpdate: (e: Exercise) => void; onDelete: () => void;
+function ExCard({ ex, onUpdate, onDelete, onClone }: {
+  ex: Exercise; onUpdate: (e: Exercise) => void; onDelete: () => void; onClone: () => void;
 }) {
   const [open, setOpen] = useState(true);
+  const [menu, setMenu] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [rest, setRest] = useState(false);
 
@@ -271,28 +299,35 @@ function ExCard({ ex, onUpdate, onDelete }: {
   return (
     <>
       <Confirm open={confirm} onClose={() => setConfirm(false)} onOk={onDelete} text={`Удалить «${ex.name}»?`} />
+      <ActionMenu
+        open={menu} onClose={() => setMenu(false)}
+        actions={[
+          { label: open ? "Свернуть" : "Развернуть", icon: open ? "ChevronUp" : "ChevronDown", onClick: () => setOpen(o => !o) },
+          { label: "Дублировать", icon: "Copy", onClick: onClone },
+          { label: "Удалить", icon: "Trash2", danger: true, onClick: () => setConfirm(true) },
+        ]}
+      />
       {rest && <RestTimer onClose={() => setRest(false)} />}
 
       <div className="bg-[#1A1A1E] rounded-2xl border border-white/8 mb-3 overflow-hidden">
-        {/* Header */}
-        <button onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-white/4">
-          <span className="text-2xl">{MUSCLE_EMOJI[ex.muscle] || "💪"}</span>
-          <div className="flex-1 min-w-0">
-            <div className="text-white font-semibold text-base truncate">{ex.name}</div>
-            <div className="text-white/35 text-xs mt-0.5">{total} подх · макс {maxW} кг</div>
-          </div>
+        <div className="flex items-center gap-3 px-4 py-3.5">
+          <button onClick={() => setOpen(o => !o)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+            <span className="text-2xl flex-shrink-0">{MUSCLE_EMOJI[ex.muscle] || "💪"}</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-white font-semibold text-base truncate">{ex.name}</div>
+              <div className="text-white/35 text-xs mt-0.5">{total} подх · макс {maxW} кг</div>
+            </div>
+          </button>
           {done > 0 && (
             <div className="bg-[#00FF88]/12 border border-[#00FF88]/20 rounded-lg px-2.5 py-1 flex-shrink-0">
               <span className="text-[#00FF88] text-xs font-bold">{done}/{total}</span>
             </div>
           )}
-          <Icon name={open ? "ChevronUp" : "ChevronDown"} size={18} className="text-white/30 flex-shrink-0" />
-          <button onClick={e => { e.stopPropagation(); setConfirm(true); }} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/25 active:bg-red-500/20 active:text-red-400 flex-shrink-0">
-            <Icon name="Trash2" size={14} />
+          <button onClick={() => setMenu(true)} className="w-9 h-9 rounded-xl bg-white/6 flex items-center justify-center text-white/40 active:bg-white/12 flex-shrink-0">
+            <Icon name="MoreVertical" size={18} />
           </button>
-        </button>
+        </div>
 
-        {/* Sets */}
         {open && (
           <div className="border-t border-white/6">
             {ex.sets.map((s, i) => (
@@ -302,7 +337,7 @@ function ExCard({ ex, onUpdate, onDelete }: {
                 onRest={() => setRest(true)}
               />
             ))}
-            <button onClick={addSet} className="w-full py-3.5 text-white/40 text-sm flex items-center justify-center gap-1.5 hover:text-[#00FF88]/70 active:bg-white/4 transition-colors">
+            <button onClick={addSet} className="w-full py-3.5 text-white/40 text-sm flex items-center justify-center gap-1.5 active:bg-white/4 transition-colors">
               <Icon name="Plus" size={15} /> Добавить подход
             </button>
           </div>
@@ -438,45 +473,42 @@ function AddDaySheet({ open, onClose, onAdd }: {
 
 // ─── Day Card ─────────────────────────────────────────────────────────────────
 
-function DayCard({ day, onClick, onDelete }: {
-  day: TrainingDay; onClick: () => void; onDelete: () => void;
+function DayCard({ day, onClick, onDelete, onClone }: {
+  day: TrainingDay; onClick: () => void; onDelete: () => void; onClone: () => void;
 }) {
+  const [menu, setMenu] = useState(false);
   const [confirm, setConfirm] = useState(false);
-  const pct = progress(day);
   const ton = tonnage(day);
-  const allSets = day.exercises.flatMap(e => e.sets);
-  const done = allSets.filter(s => s.done).length;
-  const total = allSets.length;
-  const completed = total > 0 && done === total;
 
   return (
     <>
       <Confirm open={confirm} onClose={() => setConfirm(false)} onOk={onDelete} text={`Удалить «${day.name}»?`} />
+      <ActionMenu
+        open={menu} onClose={() => setMenu(false)}
+        actions={[
+          { label: "Открыть", icon: "ArrowRight", onClick: onClick },
+          { label: "Дублировать", icon: "Copy", onClick: onClone },
+          { label: "Удалить", icon: "Trash2", danger: true, onClick: () => setConfirm(true) },
+        ]}
+      />
       <div className="bg-[#1A1A1E] rounded-2xl border border-white/8 mb-3 overflow-hidden animate-fade-in">
-        {total > 0 && (
-          <div className="h-1 bg-white/5">
-            <div className="h-full bg-[#00FF88] transition-all" style={{ width: `${pct}%`, boxShadow: "0 0 8px rgba(0,255,136,.5)" }} />
-          </div>
-        )}
-        <button onClick={onClick} className="w-full flex items-center gap-4 px-4 py-4 text-left active:bg-white/4">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 ${completed ? "bg-[#00FF88]/15" : "bg-white/6"}`}>
-            {completed ? "✅" : MUSCLE_EMOJI[day.muscle] || "💪"}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-white font-semibold text-base truncate">{day.name}</div>
-            <div className="text-white/40 text-sm mt-0.5">
-              {fmtDate(day.date)} · {day.exercises.length} упр.{ton > 0 ? ` · ${ton} кг` : ""}
+        <div className="flex items-center gap-4 px-4 py-4">
+          <button onClick={onClick} className="flex items-center gap-4 flex-1 min-w-0 text-left active:opacity-70 transition-opacity">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 bg-white/6">
+              {MUSCLE_EMOJI[day.muscle] || "💪"}
             </div>
-            {total > 0 && !completed && (
-              <div className="text-white/30 text-xs mt-1">{done}/{total} подходов · {pct}%</div>
-            )}
-            {completed && <div className="text-[#00FF88] text-xs mt-1 font-medium">Выполнено ✓</div>}
-          </div>
-          <Icon name="ChevronRight" size={18} className="text-white/20 flex-shrink-0" />
-        </button>
-        <div className="px-4 pb-3 flex justify-end">
-          <button onClick={() => setConfirm(true)} className="text-white/25 text-xs flex items-center gap-1 active:text-red-400 transition-colors py-1 px-2">
-            <Icon name="Trash2" size={13} /> Удалить
+            <div className="flex-1 min-w-0">
+              <div className="text-white font-semibold text-base truncate">{day.name}</div>
+              <div className="text-white/40 text-sm mt-0.5">
+                {fmtDate(day.date)} · {day.exercises.length} упр.{ton > 0 ? ` · ${ton} кг` : ""}
+              </div>
+            </div>
+          </button>
+          <button
+            onClick={() => setMenu(true)}
+            className="w-9 h-9 rounded-xl bg-white/6 flex items-center justify-center text-white/40 active:bg-white/12 flex-shrink-0"
+          >
+            <Icon name="MoreVertical" size={18} />
           </button>
         </div>
       </div>
@@ -496,10 +528,6 @@ function DayScreen({ day, onUpdate, onBack }: {
 
   const allSets = day.exercises.flatMap(e => e.sets);
   const done = allSets.filter(s => s.done).length;
-  const total = allSets.length;
-  const pct = total ? Math.round(done / total * 100) : 0;
-  const ton = tonnage(day);
-  const completed = total > 0 && done === total;
 
   useEffect(() => {
     if (done > 0 && !started) {
@@ -514,14 +542,20 @@ function DayScreen({ day, onUpdate, onBack }: {
   };
   const updEx = (i: number, ex: Exercise) => { const arr = [...day.exercises]; arr[i] = ex; onUpdate({ ...day, exercises: arr }); };
   const delEx = (i: number) => onUpdate({ ...day, exercises: day.exercises.filter((_, j) => j !== i) });
+  const cloneEx = (i: number) => {
+    const ex = day.exercises[i];
+    const cloned = { ...ex, id: uid(), sets: ex.sets.map(s => ({ ...s, id: uid(), done: false })) };
+    const arr = [...day.exercises]; arr.splice(i + 1, 0, cloned);
+    onUpdate({ ...day, exercises: arr });
+  };
 
   return (
     <>
       <ExPicker open={picker} onClose={() => setPicker(false)} onAdd={addEx} />
       <div className="min-h-screen bg-[#111114]">
         {/* Header */}
-        <div className="glass sticky top-0 z-30 border-b border-white/6 px-4 pt-safe pt-4 pb-3">
-          <div className="flex items-center gap-3 mb-3">
+        <div className="glass sticky top-0 z-30 border-b border-white/6 px-4 pt-4 pb-4">
+          <div className="flex items-center gap-3">
             <button onClick={onBack} className="w-10 h-10 rounded-2xl bg-white/8 flex items-center justify-center text-white/60 active:bg-white/15">
               <Icon name="ArrowLeft" size={20} />
             </button>
@@ -536,30 +570,9 @@ function DayScreen({ day, onUpdate, onBack }: {
               </div>
             )}
           </div>
-          <div className="h-2 bg-white/6 rounded-full overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${pct}%`, background: "#00FF88", boxShadow: pct > 0 ? "0 0 10px rgba(0,255,136,.4)" : "none" }}
-            />
-          </div>
-          <div className="flex justify-between mt-1.5">
-            <span className="text-white/30 text-xs">{done}/{total} подходов</span>
-            <span className={`text-xs font-semibold ${completed ? "neon-text" : "text-white/40"}`}>{completed ? "✓ Готово!" : `${pct}%`}</span>
-          </div>
         </div>
 
         <div className="px-4 pt-4 pb-36">
-          {/* Mini stats */}
-          {ton > 0 && (
-            <div className="flex gap-2 mb-4">
-              {[{ v: `${ton} кг`, l: "Тоннаж" }, { v: day.exercises.length, l: "Упражнений" }, { v: total, l: "Подходов" }].map(s => (
-                <div key={s.l} className="flex-1 bg-[#1A1A1E] border border-white/8 rounded-2xl p-3 text-center">
-                  <div className="text-white font-bold text-sm">{s.v}</div>
-                  <div className="text-white/30 text-xs">{s.l}</div>
-                </div>
-              ))}
-            </div>
-          )}
-
           {day.exercises.length === 0 && (
             <div className="text-center py-20">
               <div className="text-5xl mb-4">🏋️</div>
@@ -569,7 +582,7 @@ function DayScreen({ day, onUpdate, onBack }: {
           )}
 
           {day.exercises.map((ex, i) => (
-            <ExCard key={ex.id} ex={ex} onUpdate={e => updEx(i, e)} onDelete={() => delEx(i)} />
+            <ExCard key={ex.id} ex={ex} onUpdate={e => updEx(i, e)} onDelete={() => delEx(i)} onClone={() => cloneEx(i)} />
           ))}
         </div>
 
@@ -584,74 +597,6 @@ function DayScreen({ day, onUpdate, onBack }: {
         </div>
       </div>
     </>
-  );
-}
-
-// ─── Stats Tab ────────────────────────────────────────────────────────────────
-
-function StatsTab({ days }: { days: TrainingDay[] }) {
-  const total = days.length;
-  const totalEx = days.reduce((s, d) => s + d.exercises.length, 0);
-  const totalTon = days.reduce((s, d) => s + tonnage(d), 0);
-
-  const freq: Record<string, number> = {};
-  days.forEach(d => { freq[d.muscle] = (freq[d.muscle] || 0) + 1; });
-  const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
-  const max = sorted[0]?.[1] || 1;
-
-  return (
-    <div className="px-4 pt-4 pb-32 space-y-3">
-      <div className="grid grid-cols-3 gap-3">
-        {[{ v: total, l: "Тренировок", icon: "Calendar" }, { v: totalEx, l: "Упражнений", icon: "Dumbbell" }, { v: `${totalTon} кг`, l: "Тоннаж", icon: "TrendingUp" }]
-          .map(s => (
-            <div key={s.l} className="bg-[#1A1A1E] border border-white/8 rounded-2xl p-4 text-center">
-              <Icon name={s.icon} fallback="BarChart2" size={20} className="text-[#00FF88] mx-auto mb-2" />
-              <div className="text-white font-bold text-xl">{s.v}</div>
-              <div className="text-white/35 text-xs mt-0.5">{s.l}</div>
-            </div>
-          ))}
-      </div>
-
-      <div className="bg-[#1A1A1E] border border-white/8 rounded-2xl p-4">
-        <div className="text-white font-semibold text-sm mb-4">Мышечные группы</div>
-        {sorted.length === 0 && <div className="text-white/30 text-sm text-center py-4">Нет данных</div>}
-        <div className="space-y-3">
-          {sorted.map(([m, c]) => (
-            <div key={m} className="flex items-center gap-3">
-              <span className="text-lg">{MUSCLE_EMOJI[m]}</span>
-              <div className="flex-1">
-                <div className="flex justify-between mb-1">
-                  <span className="text-white/60 text-xs">{m}</span>
-                  <span className="text-white/30 text-xs">{c}×</span>
-                </div>
-                <div className="h-1.5 bg-white/6 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full bg-[#00FF88] transition-all"
-                    style={{ width: `${c / max * 100}%`, boxShadow: "0 0 6px rgba(0,255,136,.4)" }} />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-[#1A1A1E] border border-white/8 rounded-2xl p-4">
-        <div className="text-white font-semibold text-sm mb-3">История</div>
-        {days.length === 0 && <div className="text-white/30 text-sm text-center py-4">Нет тренировок</div>}
-        {[...days].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8).map(d => (
-          <div key={d.id} className="flex items-center gap-3 py-3 border-b border-white/5 last:border-0">
-            <span className="text-xl">{MUSCLE_EMOJI[d.muscle] || "💪"}</span>
-            <div className="flex-1">
-              <div className="text-white/80 text-sm font-medium">{d.name}</div>
-              <div className="text-white/30 text-xs">{fmtDate(d.date)}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-white/50 text-sm">{d.exercises.length} упр.</div>
-              {tonnage(d) > 0 && <div className="text-[#00FF88] text-xs">{tonnage(d)} кг</div>}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -713,6 +658,10 @@ export default function Index() {
   const addDay = (d: TrainingDay) => { setDays(ds => [d, ...ds]); showToast("Тренировка создана"); };
   const updateDay = (d: TrainingDay) => { setDays(ds => ds.map(x => x.id === d.id ? d : x)); if (selected?.id === d.id) setSelected(d); };
   const deleteDay = (id: string) => { setDays(ds => ds.filter(d => d.id !== id)); showToast("Удалено"); };
+  const cloneDay = (day: TrainingDay) => {
+    const c = { ...day, id: uid(), name: `${day.name} (копия)`, date: new Date().toISOString().slice(0, 10), exercises: day.exercises.map(ex => ({ ...ex, id: uid(), sets: ex.sets.map(s => ({ ...s, id: uid(), done: false })) })) };
+    setDays(ds => [c, ...ds]); showToast("Дублировано");
+  };;
 
   if (selected) {
     const cur = days.find(d => d.id === selected.id) || selected;
@@ -734,7 +683,6 @@ export default function Index() {
           <div className="text-white/30 text-xs uppercase tracking-widest mb-1">FitTrack</div>
           <h1 className="text-white font-bold text-3xl">
             {tab === "days" && "Тренировки"}
-            {tab === "stats" && "Прогресс"}
             {tab === "settings" && "Настройки"}
           </h1>
         </div>
@@ -764,12 +712,11 @@ export default function Index() {
               </div>
             ) : (
               sorted.map(d => (
-                <DayCard key={d.id} day={d} onClick={() => setSelected(d)} onDelete={() => deleteDay(d.id)} />
+                <DayCard key={d.id} day={d} onClick={() => setSelected(d)} onDelete={() => deleteDay(d.id)} onClone={() => cloneDay(d)} />
               ))
             )}
           </div>
         )}
-        {tab === "stats" && <StatsTab days={days} />}
         {tab === "settings" && <SettingsTab />}
       </div>
 
@@ -778,8 +725,7 @@ export default function Index() {
         <div className="flex items-center justify-around py-2 px-4">
           {([
             { t: "days" as Tab,     i: "Calendar",  l: "Дни" },
-            { t: "stats" as Tab,    i: "BarChart2",  l: "Прогресс" },
-            { t: "settings" as Tab, i: "Settings",   l: "Настройки" },
+            { t: "settings" as Tab, i: "Settings",  l: "Настройки" },
           ]).map(({ t, i, l }) => (
             <button key={t} onClick={() => setTab(t)}
               className={`flex flex-col items-center gap-1 py-2 px-6 rounded-2xl transition-all relative ${tab === t ? "text-[#00FF88]" : "text-white/30"}`}
