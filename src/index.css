@@ -228,6 +228,17 @@
   animation: pulse-neon 2s ease-in-out infinite;
 }
 
+@keyframes barBounce {
+  from {
+    transform: scaleY(0.3);
+    opacity: 0.5;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
 .timer-urgent {
   animation: timerPulse 0.8s ease-in-out infinite;
   color: #ff4d4d !important;

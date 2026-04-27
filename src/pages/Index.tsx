@@ -643,7 +643,139 @@ function SettingsTab() {
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
+// ─── Welcome Screen ───────────────────────────────────────────────────────────
+
+const TRACKS = [
+  { title: "Lose Yourself",        artist: "Eminem",          emoji: "🎤" },
+  { title: "Till I Collapse",      artist: "Eminem",          emoji: "💥" },
+  { title: "Eye of the Tiger",     artist: "Survivor",        emoji: "🐯" },
+  { title: "Thunderstruck",        artist: "AC/DC",           emoji: "⚡" },
+  { title: "Jump Around",          artist: "House of Pain",   emoji: "🔥" },
+  { title: "Harder Better Faster", artist: "Daft Punk",       emoji: "🤖" },
+  { title: "Power",                artist: "Kanye West",      emoji: "👑" },
+  { title: "Stronger",             artist: "Kanye West",      emoji: "💪" },
+];
+
+const GREETINGS = [
+  "Время рвать железо 🔥",
+  "Сегодня ты сильнее, чем вчера 💪",
+  "Без боли нет роста 🦾",
+  "Чемпионы куются здесь 🏆",
+  "Ещё один день — ещё один рекорд ⚡",
+];
+
+function WelcomeScreen({ onEnter }: { onEnter: () => void }) {
+  const touchStartY = useRef(0);
+  const [sliding, setSliding] = useState(false);
+  const [trackIdx] = useState(() => Math.floor(Math.random() * TRACKS.length));
+  const [greetIdx] = useState(() => Math.floor(Math.random() * GREETINGS.length));
+  const track = TRACKS[trackIdx];
+  const hour = new Date().getHours();
+  const timeGreet = hour < 12 ? "Доброе утро" : hour < 18 ? "Добрый день" : "Добрый вечер";
+
+  const handleTouchStart = (e: React.TouchEvent) => { touchStartY.current = e.touches[0].clientY; };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const dy = touchStartY.current - e.changedTouches[0].clientY;
+    if (dy > 60) { setSliding(true); setTimeout(onEnter, 350); }
+  };
+
+  return (
+    <div
+      className={`fixed inset-0 z-50 flex flex-col bg-[#111114] transition-transform duration-350 ${sliding ? "-translate-y-full" : "translate-y-0"}`}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      style={{ transition: sliding ? "transform 0.35s cubic-bezier(0.4,0,0.2,1)" : undefined }}
+    >
+      {/* Ambient glow */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full opacity-15"
+          style={{ background: "radial-gradient(circle, #00FF88 0%, transparent 70%)" }} />
+      </div>
+
+      {/* Music pill — top */}
+      <div className="relative px-5 pt-14">
+        <div className="flex items-center gap-3 bg-white/6 border border-white/8 rounded-2xl px-4 py-3">
+          <div className="w-10 h-10 rounded-xl bg-[#00FF88]/15 flex items-center justify-center text-xl flex-shrink-0">{track.emoji}</div>
+          <div className="flex-1 min-w-0">
+            <div className="text-white font-semibold text-sm truncate">{track.title}</div>
+            <div className="text-white/40 text-xs">{track.artist}</div>
+          </div>
+          <div className="flex items-end gap-0.5 h-5 flex-shrink-0">
+            {[3, 5, 4, 6, 3, 5].map((h, i) => (
+              <div key={i} className="w-1 rounded-full bg-[#00FF88]"
+                style={{ height: `${h * 3}px`, animation: `barBounce ${0.4 + i * 0.1}s ease-in-out infinite alternate`, opacity: 0.8 }} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Center content */}
+      <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
+        <div className="text-5xl mb-6">🏋️‍♂️</div>
+        <div className="text-white/40 text-base mb-2">{timeGreet}</div>
+        <h1 className="text-white font-bold text-4xl leading-tight mb-4">FitTrack</h1>
+        <p className="text-white/50 text-lg font-medium">{GREETINGS[greetIdx]}</p>
+      </div>
+
+      {/* Swipe hint */}
+      <div className="flex flex-col items-center pb-16 gap-3">
+        <div className="flex flex-col items-center gap-1 animate-bounce">
+          <Icon name="ChevronUp" size={20} className="text-white/25" />
+          <Icon name="ChevronUp" size={20} className="text-white/15" />
+        </div>
+        <button onClick={() => { setSliding(true); setTimeout(onEnter, 350); }}
+          className="text-white/30 text-sm font-medium tracking-wide"
+        >
+          Свайп вверх или нажми
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Music Bar ────────────────────────────────────────────────────────────────
+
+function MusicBar() {
+  const [trackIdx, setTrackIdx] = useState(() => Math.floor(Math.random() * TRACKS.length));
+  const [playing, setPlaying] = useState(true);
+  const track = TRACKS[trackIdx];
+  const next = () => setTrackIdx(i => (i + 1) % TRACKS.length);
+  const prev = () => setTrackIdx(i => (i - 1 + TRACKS.length) % TRACKS.length);
+
+  return (
+    <div className="flex items-center gap-2.5 bg-white/4 border border-white/6 rounded-2xl px-3 py-2 mx-4 mb-3">
+      <div className="w-8 h-8 rounded-xl bg-[#00FF88]/12 flex items-center justify-center text-base flex-shrink-0">{track.emoji}</div>
+      <div className="flex-1 min-w-0">
+        <div className="text-white text-xs font-semibold truncate">{track.title}</div>
+        <div className="text-white/35 text-xs truncate">{track.artist}</div>
+      </div>
+      {playing && (
+        <div className="flex items-end gap-0.5 h-4 flex-shrink-0">
+          {[3, 5, 4, 6, 3].map((h, i) => (
+            <div key={i} className="w-0.5 rounded-full bg-[#00FF88]"
+              style={{ height: `${h * 2}px`, animation: `barBounce ${0.4 + i * 0.1}s ease-in-out infinite alternate` }} />
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button onClick={prev} className="w-7 h-7 rounded-lg flex items-center justify-center text-white/40 active:text-white/80 active:bg-white/10 transition-colors">
+          <Icon name="SkipBack" size={13} />
+        </button>
+        <button onClick={() => setPlaying(p => !p)} className="w-7 h-7 rounded-lg flex items-center justify-center text-white/60 active:text-[#00FF88] active:bg-white/10 transition-colors">
+          <Icon name={playing ? "Pause" : "Play"} size={13} />
+        </button>
+        <button onClick={next} className="w-7 h-7 rounded-lg flex items-center justify-center text-white/40 active:text-white/80 active:bg-white/10 transition-colors">
+          <Icon name="SkipForward" size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── App ──────────────────────────────────────────────────────────────────────
+
 export default function Index() {
+  const [welcomed, setWelcomed] = useState(false);
   const [days, setDays] = useState<TrainingDay[]>(SAMPLE_DAYS);
   const [tab, setTab] = useState<Tab>("days");
   const [selected, setSelected] = useState<TrainingDay | null>(null);
@@ -661,7 +793,9 @@ export default function Index() {
   const cloneDay = (day: TrainingDay) => {
     const c = { ...day, id: uid(), name: `${day.name} (копия)`, date: new Date().toISOString().slice(0, 10), exercises: day.exercises.map(ex => ({ ...ex, id: uid(), sets: ex.sets.map(s => ({ ...s, id: uid(), done: false })) })) };
     setDays(ds => [c, ...ds]); showToast("Дублировано");
-  };;
+  };
+
+  if (!welcomed) return <WelcomeScreen onEnter={() => setWelcomed(true)} />;
 
   if (selected) {
     const cur = days.find(d => d.id === selected.id) || selected;
@@ -678,22 +812,26 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-[#111114]">
       {/* Header */}
-      <div className="glass border-b border-white/6 px-5 pt-12 pb-5 flex items-end justify-between">
-        <div>
-          <div className="text-white/30 text-xs uppercase tracking-widest mb-1">FitTrack</div>
-          <h1 className="text-white font-bold text-3xl">
-            {tab === "days" && "Тренировки"}
-            {tab === "settings" && "Настройки"}
-          </h1>
+      <div className="glass border-b border-white/6 px-5 pt-12 pb-4">
+        <div className="flex items-end justify-between mb-4">
+          <div>
+            <div className="text-white/30 text-xs uppercase tracking-widest mb-1">FitTrack</div>
+            <h1 className="text-white font-bold text-3xl">
+              {tab === "days" && "Тренировки"}
+              {tab === "settings" && "Настройки"}
+            </h1>
+          </div>
+          {tab === "days" && (
+            <button onClick={() => setAddOpen(true)}
+              className="w-12 h-12 rounded-2xl flex items-center justify-center text-black"
+              style={{ background: "#00FF88", boxShadow: "0 0 20px rgba(0,255,136,.4)" }}
+            >
+              <Icon name="Plus" size={22} />
+            </button>
+          )}
         </div>
-        {tab === "days" && (
-          <button onClick={() => setAddOpen(true)}
-            className="w-12 h-12 rounded-2xl flex items-center justify-center text-black"
-            style={{ background: "#00FF88", boxShadow: "0 0 20px rgba(0,255,136,.4)" }}
-          >
-            <Icon name="Plus" size={22} />
-          </button>
-        )}
+        {/* Music bar */}
+        <MusicBar />
       </div>
 
       {/* Content */}
