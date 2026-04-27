@@ -25,7 +25,7 @@ interface TrainingDay {
   id: string;
   name: string;
   date: string;
-  muscle: string;
+  muscles: string[];
   exercises: Exercise[];
 }
 
@@ -70,7 +70,7 @@ const EXERCISES: { name: string; muscle: string }[] = [
 
 const SAMPLE_DAYS: TrainingDay[] = [
   {
-    id: "d1", name: "Грудь + Трицепс", date: "2026-04-25", muscle: "Грудь",
+    id: "d1", name: "Грудь + Трицепс", date: "2026-04-25", muscles: ["Грудь", "Руки"],
     exercises: [
       { id: "e1", name: "Жим лёжа", muscle: "Грудь", sets: [
         { id: "s1", type: "warmup",  weight: 60, reps: 12, done: true  },
@@ -435,12 +435,18 @@ function AddDaySheet({ open, onClose, onAdd }: {
 }) {
   const [name, setName] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [muscle, setMuscle] = useState("Грудь");
+  const [muscles, setMuscles] = useState<string[]>(["Грудь"]);
+
+  const toggleMuscle = (m: string) => {
+    setMuscles(prev =>
+      prev.includes(m) ? (prev.length > 1 ? prev.filter(x => x !== m) : prev) : [...prev, m]
+    );
+  };
 
   const create = () => {
     if (!name.trim()) return;
-    onAdd({ id: uid(), name: name.trim(), date, muscle, exercises: [] });
-    setName(""); setDate(new Date().toISOString().slice(0, 10)); setMuscle("Грудь"); onClose();
+    onAdd({ id: uid(), name: name.trim(), date, muscles, exercises: [] });
+    setName(""); setDate(new Date().toISOString().slice(0, 10)); setMuscles(["Грудь"]); onClose();
   };
 
   return (
@@ -454,14 +460,27 @@ function AddDaySheet({ open, onClose, onAdd }: {
           style={{ colorScheme: "dark" }}
         />
         <div>
-          <div className="text-white/40 text-xs mb-2">Группа мышц</div>
-          <div className="flex gap-2 flex-wrap">
-            {MUSCLES.map(m => (
-              <button key={m} onClick={() => setMuscle(m)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${muscle === m ? "bg-[#00FF88] text-black" : "bg-white/8 text-white/60"}`}
-              >{MUSCLE_EMOJI[m]} {m}</button>
-            ))}
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-white/40 text-xs">Группы мышц</div>
+            <div className="text-[#00FF88] text-xs font-medium">{muscles.join(" + ")}</div>
           </div>
+          <div className="flex gap-2 flex-wrap">
+            {MUSCLES.map(m => {
+              const active = muscles.includes(m);
+              return (
+                <button key={m} onClick={() => toggleMuscle(m)}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${
+                    active ? "bg-[#00FF88] text-black" : "bg-white/8 text-white/60"
+                  }`}
+                >
+                  <span>{MUSCLE_EMOJI[m]}</span>
+                  <span>{m}</span>
+                  {active && muscles.length > 1 && <Icon name="X" size={12} className="text-black/50" />}
+                </button>
+              );
+            })}
+          </div>
+          <div className="text-white/20 text-xs mt-2">Можно выбрать несколько</div>
         </div>
         <button onClick={create} disabled={!name.trim()}
           className="w-full py-4 rounded-2xl bg-[#00FF88] text-black font-bold text-base disabled:opacity-40 mt-2"
@@ -494,13 +513,13 @@ function DayCard({ day, onClick, onDelete, onClone }: {
       <div className="bg-[#1A1A1E] rounded-2xl border border-white/8 mb-3 overflow-hidden animate-fade-in">
         <div className="flex items-center gap-4 px-4 py-4">
           <button onClick={onClick} className="flex items-center gap-4 flex-1 min-w-0 text-left active:opacity-70 transition-opacity">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 bg-white/6">
-              {MUSCLE_EMOJI[day.muscle] || "💪"}
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl flex-shrink-0 bg-white/6">
+              {day.muscles.length === 1 ? (MUSCLE_EMOJI[day.muscles[0]] || "💪") : day.muscles.slice(0,2).map(m => MUSCLE_EMOJI[m] || "💪").join("")}
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-white font-semibold text-base truncate">{day.name}</div>
               <div className="text-white/40 text-sm mt-0.5">
-                {fmtDate(day.date)} · {day.exercises.length} упр.{ton > 0 ? ` · ${ton} кг` : ""}
+                {fmtDate(day.date)} · {day.muscles.join(", ")}{ton > 0 ? ` · ${ton} кг` : ""}
               </div>
             </div>
           </button>
@@ -645,16 +664,6 @@ function SettingsTab() {
 
 // ─── Welcome Screen ───────────────────────────────────────────────────────────
 
-const TRACKS = [
-  { title: "Lose Yourself",        artist: "Eminem",          emoji: "🎤" },
-  { title: "Till I Collapse",      artist: "Eminem",          emoji: "💥" },
-  { title: "Eye of the Tiger",     artist: "Survivor",        emoji: "🐯" },
-  { title: "Thunderstruck",        artist: "AC/DC",           emoji: "⚡" },
-  { title: "Jump Around",          artist: "House of Pain",   emoji: "🔥" },
-  { title: "Harder Better Faster", artist: "Daft Punk",       emoji: "🤖" },
-  { title: "Power",                artist: "Kanye West",      emoji: "👑" },
-  { title: "Stronger",             artist: "Kanye West",      emoji: "💪" },
-];
 
 const GREETINGS = [
   "Время рвать железо 🔥",
@@ -667,9 +676,9 @@ const GREETINGS = [
 function WelcomeScreen({ onEnter }: { onEnter: () => void }) {
   const touchStartY = useRef(0);
   const [sliding, setSliding] = useState(false);
-  const [trackIdx] = useState(() => Math.floor(Math.random() * TRACKS.length));
+  const [trackIdx] = useState(() => Math.floor(Math.random() * YA_TRACKS.length));
   const [greetIdx] = useState(() => Math.floor(Math.random() * GREETINGS.length));
-  const track = TRACKS[trackIdx];
+  const track = YA_TRACKS[trackIdx];
   const hour = new Date().getHours();
   const timeGreet = hour < 12 ? "Доброе утро" : hour < 18 ? "Добрый день" : "Добрый вечер";
 
@@ -695,7 +704,9 @@ function WelcomeScreen({ onEnter }: { onEnter: () => void }) {
       {/* Music pill — top */}
       <div className="relative px-5 pt-14">
         <div className="flex items-center gap-3 bg-white/6 border border-white/8 rounded-2xl px-4 py-3">
-          <div className="w-10 h-10 rounded-xl bg-[#00FF88]/15 flex items-center justify-center text-xl flex-shrink-0">{track.emoji}</div>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style={{ background: "linear-gradient(135deg, #FC3F1D, #FF6534)" }}>
+              <span className="font-black text-white text-lg leading-none">Я</span>
+            </div>
           <div className="flex-1 min-w-0">
             <div className="text-white font-semibold text-sm truncate">{track.title}</div>
             <div className="text-white/40 text-xs">{track.artist}</div>
@@ -733,40 +744,82 @@ function WelcomeScreen({ onEnter }: { onEnter: () => void }) {
   );
 }
 
-// ─── Music Bar ────────────────────────────────────────────────────────────────
+// ─── Yandex Music Bar ─────────────────────────────────────────────────────────
 
-function MusicBar() {
-  const [trackIdx, setTrackIdx] = useState(() => Math.floor(Math.random() * TRACKS.length));
+const YA_TRACKS = [
+  { title: "Lose Yourself",        artist: "Eminem",          cover: "🎤", id: "4881048" },
+  { title: "Till I Collapse",      artist: "Eminem",          cover: "💥", id: "4881049" },
+  { title: "Eye of the Tiger",     artist: "Survivor",        cover: "🐯", id: "1234567" },
+  { title: "Thunderstruck",        artist: "AC/DC",           cover: "⚡", id: "2345678" },
+  { title: "Power",                artist: "Kanye West",      cover: "👑", id: "3456789" },
+  { title: "Stronger",             artist: "Kanye West",      cover: "💪", id: "4567890" },
+  { title: "Harder Better Faster", artist: "Daft Punk",       cover: "🤖", id: "5678901" },
+  { title: "Jump Around",          artist: "House of Pain",   cover: "🔥", id: "6789012" },
+];
+
+function YaMusicBar() {
+  const [idx, setIdx] = useState(() => Math.floor(Math.random() * YA_TRACKS.length));
   const [playing, setPlaying] = useState(true);
-  const track = TRACKS[trackIdx];
-  const next = () => setTrackIdx(i => (i + 1) % TRACKS.length);
-  const prev = () => setTrackIdx(i => (i - 1 + TRACKS.length) % TRACKS.length);
+  const track = YA_TRACKS[idx];
+
+  const openYaMusic = () => {
+    window.open("https://music.yandex.ru", "_blank");
+  };
 
   return (
-    <div className="flex items-center gap-2.5 bg-white/4 border border-white/6 rounded-2xl px-3 py-2 mx-4 mb-3">
-      <div className="w-8 h-8 rounded-xl bg-[#00FF88]/12 flex items-center justify-center text-base flex-shrink-0">{track.emoji}</div>
-      <div className="flex-1 min-w-0">
-        <div className="text-white text-xs font-semibold truncate">{track.title}</div>
-        <div className="text-white/35 text-xs truncate">{track.artist}</div>
-      </div>
-      {playing && (
-        <div className="flex items-end gap-0.5 h-4 flex-shrink-0">
-          {[3, 5, 4, 6, 3].map((h, i) => (
-            <div key={i} className="w-0.5 rounded-full bg-[#00FF88]"
-              style={{ height: `${h * 2}px`, animation: `barBounce ${0.4 + i * 0.1}s ease-in-out infinite alternate` }} />
-          ))}
+    <div className="mx-4 mb-3 rounded-2xl overflow-hidden border border-white/8"
+      style={{ background: "linear-gradient(135deg, #1C1C22 0%, #1A1A2E 100%)" }}>
+      <div className="flex items-center gap-3 px-3 py-2.5">
+        {/* Яндекс лого */}
+        <button onClick={openYaMusic} className="flex-shrink-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
+            style={{ background: "linear-gradient(135deg, #FC3F1D, #FF6534)" }}>
+            <span className="font-black text-white text-base leading-none">Я</span>
+          </div>
+        </button>
+
+        {/* Track info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <span className="text-white/30 text-xs">Яндекс Музыка</span>
+            {playing && (
+              <div className="flex items-end gap-px h-3">
+                {[2, 4, 3, 5, 2, 4].map((h, i) => (
+                  <div key={i} className="w-px rounded-full"
+                    style={{
+                      height: `${h * 2}px`,
+                      background: "#FC3F1D",
+                      animation: `barBounce ${0.35 + i * 0.08}s ease-in-out infinite alternate`,
+                      transformOrigin: "bottom"
+                    }} />
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="text-white font-semibold text-sm truncate leading-tight">{track.title}</div>
+          <div className="text-white/40 text-xs truncate">{track.cover} {track.artist}</div>
         </div>
-      )}
-      <div className="flex items-center gap-1 flex-shrink-0">
-        <button onClick={prev} className="w-7 h-7 rounded-lg flex items-center justify-center text-white/40 active:text-white/80 active:bg-white/10 transition-colors">
-          <Icon name="SkipBack" size={13} />
-        </button>
-        <button onClick={() => setPlaying(p => !p)} className="w-7 h-7 rounded-lg flex items-center justify-center text-white/60 active:text-[#00FF88] active:bg-white/10 transition-colors">
-          <Icon name={playing ? "Pause" : "Play"} size={13} />
-        </button>
-        <button onClick={next} className="w-7 h-7 rounded-lg flex items-center justify-center text-white/40 active:text-white/80 active:bg-white/10 transition-colors">
-          <Icon name="SkipForward" size={13} />
-        </button>
+
+        {/* Controls */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button onClick={() => setIdx(i => (i - 1 + YA_TRACKS.length) % YA_TRACKS.length)}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-white/40 active:bg-white/10 transition-colors">
+            <Icon name="SkipBack" size={14} />
+          </button>
+          <button onClick={() => setPlaying(p => !p)}
+            className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors active:scale-90"
+            style={{ background: playing ? "#FC3F1D" : "rgba(255,255,255,0.08)", color: playing ? "white" : "rgba(255,255,255,0.6)" }}>
+            <Icon name={playing ? "Pause" : "Play"} size={14} />
+          </button>
+          <button onClick={() => setIdx(i => (i + 1) % YA_TRACKS.length)}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-white/40 active:bg-white/10 transition-colors">
+            <Icon name="SkipForward" size={14} />
+          </button>
+          <button onClick={openYaMusic}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-white/30 active:bg-white/10 transition-colors">
+            <Icon name="ExternalLink" size={13} />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -791,7 +844,7 @@ export default function Index() {
   const updateDay = (d: TrainingDay) => { setDays(ds => ds.map(x => x.id === d.id ? d : x)); if (selected?.id === d.id) setSelected(d); };
   const deleteDay = (id: string) => { setDays(ds => ds.filter(d => d.id !== id)); showToast("Удалено"); };
   const cloneDay = (day: TrainingDay) => {
-    const c = { ...day, id: uid(), name: `${day.name} (копия)`, date: new Date().toISOString().slice(0, 10), exercises: day.exercises.map(ex => ({ ...ex, id: uid(), sets: ex.sets.map(s => ({ ...s, id: uid(), done: false })) })) };
+    const c: TrainingDay = { ...day, id: uid(), name: `${day.name} (копия)`, date: new Date().toISOString().slice(0, 10), muscles: [...day.muscles], exercises: day.exercises.map(ex => ({ ...ex, id: uid(), sets: ex.sets.map(s => ({ ...s, id: uid(), done: false })) })) };
     setDays(ds => [c, ...ds]); showToast("Дублировано");
   };
 
@@ -831,7 +884,7 @@ export default function Index() {
           )}
         </div>
         {/* Music bar */}
-        <MusicBar />
+        <YaMusicBar />
       </div>
 
       {/* Content */}
